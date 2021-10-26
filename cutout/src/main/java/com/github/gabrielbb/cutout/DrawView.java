@@ -20,12 +20,14 @@ import java.util.Stack;
 
 import static com.github.gabrielbb.cutout.DrawView.DrawViewAction.AUTO_CLEAR;
 import static com.github.gabrielbb.cutout.DrawView.DrawViewAction.MANUAL_CLEAR;
-import static com.github.gabrielbb.cutout.DrawView.DrawViewAction.ZOOM;
+import static com.github.gabrielbb.cutout.DrawView.DrawViewAction.NONE;
 
 class DrawView extends View {
+    static final float DISABLED_ALPHA = 0.6f;
 
     private Path livePath;
     private Paint pathPaint;
+    private ChangesHolder skipChangesHolder;
 
     private Bitmap imageBitmap;
     private final Stack<Pair<Pair<Path, Paint>, Bitmap>> cuts = new Stack<>();
@@ -46,7 +48,7 @@ class DrawView extends View {
     public enum DrawViewAction {
         AUTO_CLEAR,
         MANUAL_CLEAR,
-        ZOOM
+        NONE,
     }
 
     public DrawView(Context c, AttributeSet attrs) {
@@ -69,6 +71,11 @@ class DrawView extends View {
         this.redoButton = redoButton;
     }
 
+    public void setSkipChangesHolder(ChangesHolder holder) {
+        this.skipChangesHolder = holder;
+        changeVisibilityOfRedoButton();
+        changeVisibilityOfUndoButton();
+    }
 
     @Override
     protected void onSizeChanged(int newWidth, int newHeight, int oldWidth, int oldHeight) {
@@ -105,7 +112,7 @@ class DrawView extends View {
         pathY = y;
 
         undoneCuts.clear();
-        redoButton.setEnabled(false);
+        changeVisibilityOfRedoButton();
 
         if (currentAction == AUTO_CLEAR) {
             new AutomaticPixelClearingTask(this).execute((int) x, (int) y);
@@ -134,12 +141,20 @@ class DrawView extends View {
             livePath.lineTo(pathX, pathY);
             cuts.push(new Pair<>(new Pair<>(livePath, pathPaint), null));
             livePath = new Path();
-            undoButton.setEnabled(true);
+            changeVisibilityOfUndoButton();
         }
     }
 
+    public int getUndoCount () {
+        return cuts.size();
+    }
+
+    public int getRedoCount () {
+        return undoneCuts.size();
+    }
+
     public void undo() {
-        if (cuts.size() > 0) {
+        if (cuts.size() > 0 && undoButton.getAlpha() == 1.0f) {
 
             Pair<Pair<Path, Paint>, Bitmap> cut = cuts.pop();
 
@@ -150,19 +165,16 @@ class DrawView extends View {
                 undoneCuts.push(cut);
             }
 
-            if (cuts.isEmpty()) {
-                undoButton.setEnabled(false);
-            }
+            changeVisibilityOfUndoButton();
 
-            redoButton.setEnabled(true);
+            changeVisibilityOfRedoButton();
 
             invalidate();
         }
-        //toast the user
     }
 
     public void redo() {
-        if (undoneCuts.size() > 0) {
+        if (undoneCuts.size() > 0 && undoButton.getAlpha() == 1.0f) {
 
             Pair<Pair<Path, Paint>, Bitmap> cut = undoneCuts.pop();
 
@@ -173,21 +185,42 @@ class DrawView extends View {
                 cuts.push(cut);
             }
 
-            if (undoneCuts.isEmpty()) {
-                redoButton.setEnabled(false);
-            }
-
-            undoButton.setEnabled(true);
+            changeVisibilityOfRedoButton();
+            changeVisibilityOfUndoButton();
 
             invalidate();
         }
         //toast the user
     }
 
+    private void changeVisibilityOfRedoButton () {
+        if (skipChangesHolder == null) {
+            if (undoneCuts.isEmpty()) {
+                redoButton.setAlpha(DISABLED_ALPHA);
+            } else {
+                redoButton.setAlpha(1.0f);
+            }
+        } else {
+            redoButton.setAlpha(skipChangesHolder.undoneCount >= undoneCuts.size() ? DISABLED_ALPHA : 1.0f);
+        }
+    }
+
+    private void changeVisibilityOfUndoButton () {
+        if (skipChangesHolder == null) {
+            if (cuts.isEmpty()) {
+                undoButton.setAlpha(DISABLED_ALPHA);
+            } else {
+                undoButton.setAlpha(1.0f);
+            }
+        } else {
+            undoButton.setAlpha(skipChangesHolder.cutsCount >= cuts.size() ? DISABLED_ALPHA : 1.0f);
+        }
+    }
+
     @Override
     public boolean onTouchEvent(MotionEvent ev) {
 
-        if (imageBitmap != null && currentAction != ZOOM) {
+        if (imageBitmap != null && currentAction != NONE) {
             switch (ev.getAction()) {
                 case MotionEvent.ACTION_DOWN:
                     touchStart(ev.getX(), ev.getY());
@@ -296,7 +329,7 @@ class DrawView extends View {
         protected void onPostExecute(Bitmap result) {
             super.onPostExecute(result);
             drawViewWeakReference.get().imageBitmap = result;
-            drawViewWeakReference.get().undoButton.setEnabled(true);
+            drawViewWeakReference.get().changeVisibilityOfUndoButton();
             drawViewWeakReference.get().loadingModal.setVisibility(INVISIBLE);
             drawViewWeakReference.get().invalidate();
         }

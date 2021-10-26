@@ -7,8 +7,8 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
-import android.graphics.Color;
 import android.graphics.PorterDuff;
+import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.MediaStore;
@@ -23,6 +23,7 @@ import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.SeekBar;
+import android.widget.TextView;
 
 import com.alexvasilkov.gestures.views.interfaces.GestureView;
 import com.theartofdev.edmodo.cropper.CropImage;
@@ -39,206 +40,45 @@ import static android.view.View.INVISIBLE;
 import static android.view.View.VISIBLE;
 import static com.github.gabrielbb.cutout.CutOut.CUTOUT_EXTRA_INTRO;
 
-public class CutOutActivity extends AppCompatActivity {
+enum BottomBarMode {
+    DEFAULT,
+    BRUSH,
+    CLEAR_BACKGROUND
+}
 
+class ChangesHolder {
+    int cutsCount;
+    int undoneCount;
+
+    public ChangesHolder(int cutsCount, int undoneCount) {
+        this.cutsCount = cutsCount;
+        this.undoneCount = undoneCount;
+    }
+}
+
+public class CutOutActivity extends AppCompatActivity {
     private static final int INTRO_REQUEST_CODE = 4;
     private static final int WRITE_EXTERNAL_STORAGE_CODE = 1;
     private static final int IMAGE_CHOOSER_REQUEST_CODE = 2;
     private static final int CAMERA_REQUEST_CODE = 3;
-
     private static final String INTRO_SHOWN = "INTRO_SHOWN";
+
     FrameLayout loadingModal;
     private GestureView gestureView;
     private DrawView drawView;
-    private LinearLayout manualClearSettingsLayout;
+    private LinearLayout defaultBottomBar;
+    private LinearLayout brushBottomBar;
+    private SeekBar seekBar;
+    private TextView seekBarText;
+    private Button doneButton;
+    private Button undoButton;
+    private Button redoButton;
+    private ChangesHolder drawViewLastChanges;
 
     private static final short MAX_ERASER_SIZE = 150;
     private static final short BORDER_SIZE = 45;
-    private static final float MAX_ZOOM = 4F;
 
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-
-        setContentView(R.layout.activity_photo_edit);
-
-        Toolbar toolbar = findViewById(R.id.photo_edit_toolbar);
-//        toolbar.setBackgroundColor(Color.BLACK);
-//        toolbar.setTitleTextColor(Color.WHITE);
-        setSupportActionBar(toolbar);
-
-        FrameLayout drawViewLayout = findViewById(R.id.drawViewLayout);
-
-        int sdk = android.os.Build.VERSION.SDK_INT;
-
-        if (sdk < android.os.Build.VERSION_CODES.JELLY_BEAN) {
-            drawViewLayout.setBackgroundDrawable(CheckerboardDrawable.create());
-        } else {
-            drawViewLayout.setBackground(CheckerboardDrawable.create());
-        }
-
-        SeekBar strokeBar = findViewById(R.id.strokeBar);
-        strokeBar.setMax(MAX_ERASER_SIZE);
-        strokeBar.setProgress(50);
-
-        gestureView = findViewById(R.id.gestureView);
-
-        drawView = findViewById(R.id.drawView);
-        drawView.setDrawingCacheEnabled(true);
-        drawView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
-        //drawView.setDrawingCacheEnabled(true);
-        drawView.setStrokeWidth(strokeBar.getProgress());
-
-        strokeBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            @Override
-            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-
-            }
-
-            @Override
-            public void onStartTrackingTouch(SeekBar seekBar) {
-
-            }
-
-            @Override
-            public void onStopTrackingTouch(SeekBar seekBar) {
-                drawView.setStrokeWidth(seekBar.getProgress());
-            }
-        });
-
-        loadingModal = findViewById(R.id.loadingModal);
-        loadingModal.setVisibility(INVISIBLE);
-
-        drawView.setLoadingModal(loadingModal);
-
-        manualClearSettingsLayout = findViewById(R.id.manual_clear_settings_layout);
-
-        setUndoRedo();
-        initializeActionButtons();
-
-        if (getSupportActionBar() != null) {
-            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-            getSupportActionBar().setDisplayShowHomeEnabled(true);
-            getSupportActionBar().setDisplayShowTitleEnabled(false);
-
-            if (toolbar.getNavigationIcon() != null) {
-                toolbar.getNavigationIcon().setColorFilter(getResources().getColor(R.color.black), PorterDuff.Mode.SRC_ATOP);
-            }
-
-        }
-
-        Button doneButton = findViewById(R.id.done);
-
-        doneButton.setOnClickListener(v -> startSaveDrawingTask());
-
-        if (getIntent().getBooleanExtra(CUTOUT_EXTRA_INTRO, false) && !getPreferences(Context.MODE_PRIVATE).getBoolean(INTRO_SHOWN, false)) {
-            Intent intent = new Intent(this, IntroActivity.class);
-            startActivityForResult(intent, INTRO_REQUEST_CODE);
-        } else {
-            start();
-        }
-    }
-
-    @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        switch (item.getItemId()) {
-            // Respond to the action bar's Up/Home button
-            case android.R.id.home:
-                setResult(RESULT_CANCELED);
-                finish();
-                return true;
-        }
-        return super.onOptionsItemSelected(item);
-    }
-
-    private Uri getExtraSource() {
-        return getIntent().hasExtra(CutOut.CUTOUT_EXTRA_SOURCE) ? (Uri) getIntent().getParcelableExtra(CutOut.CUTOUT_EXTRA_SOURCE) : null;
-    }
-
-    private void start() {
-        if (ContextCompat.checkSelfPermission(this,
-                Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
-
-            Uri uri = getExtraSource();
-
-            if (getIntent().getBooleanExtra(CutOut.CUTOUT_EXTRA_CROP, false)) {
-
-                CropImage.ActivityBuilder cropImageBuilder;
-                if (uri != null) {
-                    cropImageBuilder = CropImage.activity(uri);
-                } else {
-                    if (ContextCompat.checkSelfPermission(this,
-                            Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
-
-                        cropImageBuilder = CropImage.activity();
-                    } else {
-                        ActivityCompat.requestPermissions(this,
-                                new String[]{Manifest.permission.CAMERA},
-                                CAMERA_REQUEST_CODE);
-                        return;
-                    }
-                }
-
-                cropImageBuilder = cropImageBuilder.setGuidelines(CropImageView.Guidelines.ON);
-                cropImageBuilder.start(this);
-            } else {
-                if (uri != null) {
-                    setDrawViewBitmap(uri);
-                } else {
-                    if (ContextCompat.checkSelfPermission(this,
-                            Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
-
-                        EasyImage.openChooserWithGallery(this, getString(R.string.image_chooser_message), IMAGE_CHOOSER_REQUEST_CODE);
-                    } else {
-                        ActivityCompat.requestPermissions(this,
-                                new String[]{Manifest.permission.CAMERA},
-                                CAMERA_REQUEST_CODE);
-                    }
-                }
-            }
-
-        } else {
-            ActivityCompat.requestPermissions(this,
-                    new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE},
-                    WRITE_EXTERNAL_STORAGE_CODE);
-        }
-    }
-
-    private void startSaveDrawingTask() {
-        SaveDrawingTask task = new SaveDrawingTask(this);
-
-        int borderColor;
-        if ((borderColor = getIntent().getIntExtra(CutOut.CUTOUT_EXTRA_BORDER_COLOR, -1)) != -1) {
-            Bitmap image = BitmapUtility.getBorderedBitmap(this.drawView.getDrawingCache(), borderColor, BORDER_SIZE);
-            task.execute(image);
-        } else {
-            task.execute(this.drawView.getDrawingCache());
-        }
-    }
-
-    @Override
-    public void onRequestPermissionsResult(int requestCode,
-                                           @NonNull String permissions[], @NonNull int[] grantResults) {
-        if (grantResults.length > 0
-                && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-            start();
-        } else {
-            setResult(Activity.RESULT_CANCELED);
-            finish();
-        }
-    }
-
-    private void activateGestureView() {
-        gestureView.getController().getSettings()
-                .setMaxZoom(MAX_ZOOM)
-                .setDoubleTapZoom(-1f) // Falls back to max zoom level
-                .setPanEnabled(true)
-                .setZoomEnabled(true)
-                .setDoubleTapEnabled(true)
-                .setOverscrollDistance(0f, 0f)
-                .setOverzoomFactor(2f);
-    }
-
+    private BottomBarMode bottomBarMode = BottomBarMode.DEFAULT;
     private void deactivateGestureView() {
         gestureView.getController().getSettings()
                 .setPanEnabled(false)
@@ -247,57 +87,113 @@ public class CutOutActivity extends AppCompatActivity {
     }
 
     private void initializeActionButtons() {
-        Button autoClearButton = findViewById(R.id.auto_clear_button);
-        Button manualClearButton = findViewById(R.id.manual_clear_button);
-        Button zoomButton = findViewById(R.id.zoom_button);
-
-        autoClearButton.setActivated(false);
+        LinearLayout autoClearButton = findViewById(R.id.auto_clear_button);
+        LinearLayout manualClearButton = findViewById(R.id.manual_clear_button);
         autoClearButton.setOnClickListener((buttonView) -> {
-            if (!autoClearButton.isActivated()) {
-                drawView.setAction(DrawView.DrawViewAction.AUTO_CLEAR);
-                manualClearSettingsLayout.setVisibility(INVISIBLE);
-                autoClearButton.setActivated(true);
-                manualClearButton.setActivated(false);
-                zoomButton.setActivated(false);
-                deactivateGestureView();
-            }
+            bottomBarMode = BottomBarMode.CLEAR_BACKGROUND;
+            drawView.setAction(DrawView.DrawViewAction.AUTO_CLEAR);
+            autoClearButton.setAlpha(0.7f);
+            manualClearButton.setAlpha(1.0f);
+            deactivateGestureView();
+            handleBottomActionButtonChange();
         });
 
-        manualClearButton.setActivated(true);
         drawView.setAction(DrawView.DrawViewAction.MANUAL_CLEAR);
         manualClearButton.setOnClickListener((buttonView) -> {
-            if (!manualClearButton.isActivated()) {
-                drawView.setAction(DrawView.DrawViewAction.MANUAL_CLEAR);
-                manualClearSettingsLayout.setVisibility(VISIBLE);
-                manualClearButton.setActivated(true);
-                autoClearButton.setActivated(false);
-                zoomButton.setActivated(false);
-                deactivateGestureView();
-            }
-
+            bottomBarMode = BottomBarMode.BRUSH;
+            drawView.setAction(DrawView.DrawViewAction.MANUAL_CLEAR);
+            manualClearButton.setAlpha(0.7f);
+            autoClearButton.setAlpha(1.0f);
+            deactivateGestureView();
+            handleBottomActionButtonChange();
         });
 
-        zoomButton.setActivated(false);
         deactivateGestureView();
-        zoomButton.setOnClickListener((buttonView) -> {
-            if (!zoomButton.isActivated()) {
-                drawView.setAction(DrawView.DrawViewAction.ZOOM);
-                manualClearSettingsLayout.setVisibility(INVISIBLE);
-                zoomButton.setActivated(true);
-                manualClearButton.setActivated(false);
-                autoClearButton.setActivated(false);
-                activateGestureView();
-            }
-
-        });
     }
 
+
+    private void handleBottomActionButtonChange () {
+        doneButton.setVisibility(VISIBLE);
+        if (bottomBarMode == BottomBarMode.DEFAULT) {
+            getSupportActionBar().setHomeAsUpIndicator(R.drawable.close);
+            drawView.setAction(DrawView.DrawViewAction.NONE);
+            doneButton.setVisibility(INVISIBLE);
+            brushBottomBar.setVisibility(INVISIBLE);
+            defaultBottomBar.setVisibility(VISIBLE);
+        } else {
+            getSupportActionBar().setHomeAsUpIndicator(R.drawable.back);
+            drawViewLastChanges = new ChangesHolder(
+                    drawView.getUndoCount(),
+                    drawView.getRedoCount()
+            );
+
+            drawView.setSkipChangesHolder(new ChangesHolder(
+                    drawViewLastChanges.cutsCount,
+                    drawViewLastChanges.undoneCount
+            ));
+
+            if (bottomBarMode == BottomBarMode.BRUSH) {
+                defaultBottomBar.setVisibility(INVISIBLE);
+                brushBottomBar.setVisibility(VISIBLE);
+            } else {
+                brushBottomBar.setVisibility(INVISIBLE);
+                defaultBottomBar.setVisibility(INVISIBLE);
+            }
+        }
+    }
+
+    private void handleSeekBar () {
+        seekBar = findViewById(R.id.seekbar);
+        seekBar.setMax(MAX_ERASER_SIZE);
+        seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                int value = (progress * (seekBar.getWidth() - 2 * seekBar.getThumbOffset())) / seekBar.getMax();
+                seekBarText.setText("" + progress);
+                seekBarText.setX(seekBar.getX() + value + seekBar.getThumbOffset() / 2);
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {
+                drawView.setStrokeWidth(seekBar.getProgress());
+            }
+        });
+
+        seekBar.setProgress(50);
+        int value = (50 * (seekBar.getWidth() - 2 * seekBar.getThumbOffset())) / seekBar.getMax();
+        seekBarText.setX(seekBar.getX() + value + seekBar.getThumbOffset() / 2);
+    }
+
+    private void customizeDefault () {
+        FrameLayout drawViewLayout = findViewById(R.id.drawViewLayout);
+        int sdk = android.os.Build.VERSION.SDK_INT;
+        if (sdk < android.os.Build.VERSION_CODES.JELLY_BEAN) {
+            drawViewLayout.setBackgroundDrawable(CheckerboardDrawable.create());
+        } else {
+            drawViewLayout.setBackground(CheckerboardDrawable.create());
+        }
+
+        drawView.setDrawingCacheEnabled(true);
+        drawView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
+        drawView.setStrokeWidth(50);
+        drawView.setAction(DrawView.DrawViewAction.NONE);
+        loadingModal = findViewById(R.id.loadingModal);
+        loadingModal.setVisibility(INVISIBLE);
+        drawView.setLoadingModal(loadingModal);
+    }
+
+    /// MARK: - Main methods
+
     private void setUndoRedo() {
-        Button undoButton = findViewById(R.id.undo);
-        undoButton.setEnabled(false);
+        undoButton = findViewById(R.id.undo);
+        undoButton.setAlpha(DrawView.DISABLED_ALPHA);
         undoButton.setOnClickListener(v -> undo());
-        Button redoButton = findViewById(R.id.redo);
-        redoButton.setEnabled(false);
+        redoButton = findViewById(R.id.redo);
+        redoButton.setAlpha(DrawView.DISABLED_ALPHA);
         redoButton.setOnClickListener(v -> redo());
 
         drawView.setButtons(undoButton, redoButton);
@@ -376,4 +272,173 @@ public class CutOutActivity extends AppCompatActivity {
         drawView.redo();
     }
 
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_photo_edit);
+        Toolbar toolbar = findViewById(R.id.photo_edit_toolbar);
+        setSupportActionBar(toolbar);
+        gestureView = findViewById(R.id.gestureView);
+        drawView = findViewById(R.id.drawView);
+        defaultBottomBar = findViewById(R.id.default_bottom_bar);
+        brushBottomBar = findViewById(R.id.seekbar_layout);
+        seekBarText = findViewById(R.id.progress_text);
+        doneButton = findViewById(R.id.done_button);
+        handleSeekBar();
+
+        customizeDefault();
+
+        setUndoRedo();
+        initializeActionButtons();
+
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+            getSupportActionBar().setDisplayShowHomeEnabled(true);
+            getSupportActionBar().setDisplayShowTitleEnabled(true);
+            getSupportActionBar().setHomeAsUpIndicator(R.drawable.close);
+            if (toolbar.getNavigationIcon() != null) {
+                toolbar.getNavigationIcon().setColorFilter(getResources().getColor(R.color.black), PorterDuff.Mode.SRC_ATOP);
+            }
+
+        }
+
+        doneButton.setOnClickListener(v -> {
+            bottomBarMode = BottomBarMode.DEFAULT;
+            handleBottomActionButtonChange();
+        });
+
+        Button doneNavButton = findViewById(R.id.done);
+        doneNavButton.setOnClickListener(v -> startSaveDrawingTask());
+
+        if (getIntent().getBooleanExtra(CUTOUT_EXTRA_INTRO, false) && !getPreferences(Context.MODE_PRIVATE).getBoolean(INTRO_SHOWN, false)) {
+            Intent intent = new Intent(this, IntroActivity.class);
+            startActivityForResult(intent, INTRO_REQUEST_CODE);
+        } else {
+            start();
+        }
+
+        handleBottomActionButtonChange();
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        switch (item.getItemId()) {
+            case android.R.id.home:
+                if (bottomBarMode == BottomBarMode.DEFAULT) {
+                    setResult(RESULT_CANCELED);
+                    finish();
+                    return true;
+                } else {
+                    handleUndoChanges();
+                    return false;
+                }
+        }
+        return super.onOptionsItemSelected(item);
+    }
+
+    private Uri getExtraSource() {
+        return getIntent().hasExtra(CutOut.CUTOUT_EXTRA_SOURCE) ? (Uri) getIntent().getParcelableExtra(CutOut.CUTOUT_EXTRA_SOURCE) : null;
+    }
+
+    private void start() {
+        if (ContextCompat.checkSelfPermission(this,
+                Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
+
+            Uri uri = getExtraSource();
+
+            if (getIntent().getBooleanExtra(CutOut.CUTOUT_EXTRA_CROP, false)) {
+
+                CropImage.ActivityBuilder cropImageBuilder;
+                if (uri != null) {
+                    cropImageBuilder = CropImage.activity(uri);
+                } else {
+                    if (ContextCompat.checkSelfPermission(this,
+                            Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+
+                        cropImageBuilder = CropImage.activity();
+                    } else {
+                        ActivityCompat.requestPermissions(this,
+                                new String[]{Manifest.permission.CAMERA},
+                                CAMERA_REQUEST_CODE);
+                        return;
+                    }
+                }
+
+                cropImageBuilder = cropImageBuilder.setGuidelines(CropImageView.Guidelines.ON);
+                cropImageBuilder.start(this);
+            } else {
+                if (uri != null) {
+                    setDrawViewBitmap(uri);
+                } else {
+                    if (ContextCompat.checkSelfPermission(this,
+                            Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+
+                        EasyImage.openChooserWithGallery(this, getString(R.string.image_chooser_message), IMAGE_CHOOSER_REQUEST_CODE);
+                    } else {
+                        ActivityCompat.requestPermissions(this,
+                                new String[]{Manifest.permission.CAMERA},
+                                CAMERA_REQUEST_CODE);
+                    }
+                }
+            }
+
+        } else {
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE},
+                    WRITE_EXTERNAL_STORAGE_CODE);
+        }
+    }
+
+    private void startSaveDrawingTask() {
+        SaveDrawingTask task = new SaveDrawingTask(this);
+
+        int borderColor;
+        if ((borderColor = getIntent().getIntExtra(CutOut.CUTOUT_EXTRA_BORDER_COLOR, -1)) != -1) {
+            Bitmap image = BitmapUtility.getBorderedBitmap(this.drawView.getDrawingCache(), borderColor, BORDER_SIZE);
+            task.execute(image);
+        } else {
+            task.execute(this.drawView.getDrawingCache());
+        }
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (bottomBarMode == BottomBarMode.DEFAULT) {
+            super.onBackPressed();
+        } else {
+            handleUndoChanges();
+        }
+    }
+
+    private void handleUndoChanges () {
+        bottomBarMode = BottomBarMode.DEFAULT;
+        drawView.setAction(DrawView.DrawViewAction.NONE);
+        int undoneDiff = drawView.getRedoCount() - drawViewLastChanges.undoneCount;
+        int cutsDiff = drawView.getUndoCount() - drawViewLastChanges.cutsCount;
+
+        for (int i = 0; i < undoneDiff; i++) {
+            drawView.redo();
+        }
+
+        for (int i = 0; i < cutsDiff; i++) {
+            drawView.undo();
+        }
+
+
+        handleBottomActionButtonChange();
+    }
+
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode,
+                                           @NonNull String permissions[], @NonNull int[] grantResults) {
+        if (grantResults.length > 0
+                && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            start();
+        } else {
+            setResult(Activity.RESULT_CANCELED);
+            finish();
+        }
+    }
 }
+
