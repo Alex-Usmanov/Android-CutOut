@@ -2,12 +2,15 @@ package com.github.gabrielbb.cutout;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.Dialog;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
+import android.graphics.Color;
 import android.graphics.PorterDuff;
+import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Bundle;
@@ -19,6 +22,7 @@ import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.view.MenuItem;
 import android.view.View;
+import android.view.ViewTreeObserver;
 import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
@@ -63,6 +67,9 @@ public class CutOutActivity extends AppCompatActivity {
     private static final int CAMERA_REQUEST_CODE = 3;
     private static final String INTRO_SHOWN = "INTRO_SHOWN";
 
+    private boolean didShowDialog = false;
+    private Dialog dialog;
+
     FrameLayout loadingModal;
     private GestureView gestureView;
     private DrawView drawView;
@@ -75,7 +82,7 @@ public class CutOutActivity extends AppCompatActivity {
     private Button redoButton;
     private ChangesHolder drawViewLastChanges;
 
-    private static final short MAX_ERASER_SIZE = 150;
+    private static final short MAX_ERASER_SIZE = 100;
     private static final short BORDER_SIZE = 45;
 
     private BottomBarMode bottomBarMode = BottomBarMode.DEFAULT;
@@ -136,10 +143,26 @@ public class CutOutActivity extends AppCompatActivity {
                 defaultBottomBar.setVisibility(INVISIBLE);
                 brushBottomBar.setVisibility(VISIBLE);
             } else {
+                if (!didShowDialog) {
+                    didShowDialog = true;
+                    showDialogAboutBackgroundRemoval();
+                }
+
                 brushBottomBar.setVisibility(INVISIBLE);
                 defaultBottomBar.setVisibility(INVISIBLE);
             }
         }
+    }
+
+    private void showDialogAboutBackgroundRemoval () {
+        dialog = new Dialog(this);
+        dialog.setContentView(R.layout.background_remove_dialog);
+        dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+        Button dialogButton = dialog.findViewById(R.id.dialog_button);
+        dialogButton.setOnClickListener(v -> {
+            dialog.dismiss();
+        });
+        dialog.show();
     }
 
     private void handleSeekBar () {
@@ -164,8 +187,6 @@ public class CutOutActivity extends AppCompatActivity {
         });
 
         seekBar.setProgress(50);
-        int value = (50 * (seekBar.getWidth() - 2 * seekBar.getThumbOffset())) / seekBar.getMax();
-        seekBarText.setX(seekBar.getX() + value + seekBar.getThumbOffset() / 2);
     }
 
     private void customizeDefault () {
@@ -318,6 +339,20 @@ public class CutOutActivity extends AppCompatActivity {
         }
 
         handleBottomActionButtonChange();
+
+        seekBar.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener()
+        {
+            @Override
+            public boolean onPreDraw()
+            {
+                if (seekBar.getViewTreeObserver().isAlive())
+                    seekBar.getViewTreeObserver().removeOnPreDrawListener(this);
+
+                int value = (50 * (seekBar.getWidth() - 2 * seekBar.getThumbOffset())) / seekBar.getMax();
+                seekBarText.setX(seekBar.getX() + value + seekBar.getThumbOffset() / 2);
+                return true;
+            }
+        });
     }
 
     @Override

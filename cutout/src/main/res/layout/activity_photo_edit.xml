@@ -111,13 +111,14 @@
                 android:textStyle="bold"
                 android:layout_marginLeft="12dp"
                 android:layout_marginRight="12dp"
-                android:text="25"/>
+                android:layout_marginBottom="1dp"
+                android:text="50"/>
             <SeekBar
                 android:id="@+id/seekbar"
                 android:splitTrack="false"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:max="350"
+                android:max="100"
                 android:progress="50"
                 android:thumb="@xml/seekbar_thumb"
                 android:progressDrawable="@xml/seekbar_progress"
