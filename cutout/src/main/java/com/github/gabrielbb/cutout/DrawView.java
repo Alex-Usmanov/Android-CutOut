@@ -265,41 +265,6 @@ class DrawView extends View {
         pathPaint.setStrokeWidth(strokeWidth);
     }
 
-    public void removeAlphaChannel() {
-        Bitmap bmp = imageBitmap;
-        int imgHeight = bmp.getHeight();
-        int imgWidth  = bmp.getWidth();
-        int smallX = 0, largeX = imgWidth;
-        int smallY = 0, largeY = imgHeight;
-        int left = imgWidth, right = imgWidth, top = imgHeight, bottom = imgHeight;
-
-        for(int x=0; x < imgWidth; x++) {
-            for(int y=0; y < imgHeight; y++) {
-                if (bmp.getPixel(x, y) != Color.TRANSPARENT) {
-                    if ((x - smallX) < left) {
-                        left = x - smallX;
-                    }
-
-                    if ((largeX-x) < right) {
-                        right = largeX-x;
-                    }
-
-                    if ((y-smallY) < top) {
-                        top = y-smallY;
-                    }
-
-                    if ((largeY-y) < bottom) {
-                        bottom = largeY-y;
-                    }
-                }
-            }
-        }
-
-        bmp=Bitmap.createBitmap(bmp,left,top,imgWidth-left-right, imgHeight-top-bottom);
-        imageBitmap = bmp;
-        invalidate();
-    }
-
     public void setLoadingModal(View loadingModal) {
         this.loadingModal = loadingModal;
     }
