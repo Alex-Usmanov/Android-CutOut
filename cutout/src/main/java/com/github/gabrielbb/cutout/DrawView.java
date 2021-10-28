@@ -297,6 +297,7 @@ class DrawView extends View {
 
         bmp=Bitmap.createBitmap(bmp,left,top,imgWidth-left-right, imgHeight-top-bottom);
         imageBitmap = bmp;
+        invalidate();
     }
 
     public void setLoadingModal(View loadingModal) {
