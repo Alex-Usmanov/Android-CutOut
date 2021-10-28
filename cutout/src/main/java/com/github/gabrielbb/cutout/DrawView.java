@@ -266,55 +266,11 @@ class DrawView extends View {
     }
 
     public void removeAlphaChannel() {
-        Bitmap source = this.imageBitmap;
-        int firstX = 0, firstY = 0;
-        int lastX = source.getWidth();
-        int lastY = source.getHeight();
-        int[] pixels = new int[source.getWidth() * source.getHeight()];
-        source.getPixels(pixels, 0, source.getWidth(), 0, 0, source.getWidth(), source.getHeight());
-        loop:
-        for (int x = 0; x < source.getWidth(); x++) {
-            for (int y = 0; y < source.getHeight(); y++) {
-                if (pixels[x + (y * source.getWidth())] != Color.TRANSPARENT) {
-                    firstX = x;
-                    break loop;
-                }
-            }
-        }
-        loop:
-        for (int y = 0; y < source.getHeight(); y++) {
-            for (int x = firstX; x < source.getWidth(); x++) {
-                if (pixels[x + (y * source.getWidth())] != Color.TRANSPARENT) {
-                    firstY = y;
-                    break loop;
-                }
-            }
-        }
-        loop:
-        for (int x = source.getWidth() - 1; x >= firstX; x--) {
-            for (int y = source.getHeight() - 1; y >= firstY; y--) {
-                if (pixels[x + (y * source.getWidth())] != Color.TRANSPARENT) {
-                    lastX = x;
-                    break loop;
-                }
-            }
-        }
-        loop:
-        for (int y = source.getHeight() - 1; y >= firstY; y--) {
-            for (int x = source.getWidth() - 1; x >= firstX; x--) {
-                if (pixels[x + (y * source.getWidth())] != Color.TRANSPARENT) {
-                    lastY = y;
-                    break loop;
-                }
-            }
-        }
-        imageBitmap = Bitmap.createBitmap(
-                source,
-                firstX,
-                firstY,
-                lastX - firstX,
-                lastY - firstY
-        );
+        Bitmap imageWithBG = Bitmap.createBitmap(imageBitmap.getWidth(), imageBitmap.getHeight(),imageBitmap.getConfig());  // Create another image the same size
+        imageWithBG.eraseColor(Color.WHITE);  // set its background to white, or whatever color you want
+        Canvas canvas = new Canvas(imageWithBG);  // create a canvas to draw on the new image
+        canvas.drawBitmap(imageBitmap, 0f, 0f, null); // draw old image on the background
+        imageBitmap.recycle();  // clear out old image
     }
 
     public void setLoadingModal(View loadingModal) {
