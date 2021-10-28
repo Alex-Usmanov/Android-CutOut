@@ -424,8 +424,12 @@ public class CutOutActivity extends AppCompatActivity {
         }
     }
 
-    private void startSaveDrawingTask() {
+    public void removeAlphaChannels () {
         drawView.removeAlphaChannel();
+    }
+
+    private void startSaveDrawingTask() {
+
         SaveDrawingTask task = new SaveDrawingTask(this);
 
         int borderColor;

@@ -35,7 +35,7 @@ class SaveDrawingTask extends AsyncTask<Bitmap, Void, Pair<File, Exception>> {
 
     @Override
     protected Pair<File, Exception> doInBackground(Bitmap... bitmaps) {
-
+        activityWeakReference.get().removeAlphaChannels();
         try {
             File file = File.createTempFile(SAVED_IMAGE_NAME, SAVED_IMAGE_FORMAT, activityWeakReference.get().getApplicationContext().getCacheDir());
 

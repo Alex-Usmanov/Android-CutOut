@@ -266,11 +266,37 @@ class DrawView extends View {
     }
 
     public void removeAlphaChannel() {
-        Bitmap imageWithBG = Bitmap.createBitmap(imageBitmap.getWidth(), imageBitmap.getHeight(),imageBitmap.getConfig());  // Create another image the same size
-        imageWithBG.eraseColor(Color.WHITE);  // set its background to white, or whatever color you want
-        Canvas canvas = new Canvas(imageWithBG);  // create a canvas to draw on the new image
-        canvas.drawBitmap(imageBitmap, 0f, 0f, null); // draw old image on the background
-        imageBitmap.recycle();  // clear out old image
+        Bitmap bmp = imageBitmap;
+        int imgHeight = bmp.getHeight();
+        int imgWidth  = bmp.getWidth();
+        int smallX = 0, largeX = imgWidth;
+        int smallY = 0, largeY = imgHeight;
+        int left = imgWidth, right = imgWidth, top = imgHeight, bottom = imgHeight;
+
+        for(int x=0; x < imgWidth; x++) {
+            for(int y=0; y < imgHeight; y++) {
+                if (bmp.getPixel(x, y) != Color.TRANSPARENT) {
+                    if ((x - smallX) < left) {
+                        left = x - smallX;
+                    }
+
+                    if ((largeX-x) < right) {
+                        right = largeX-x;
+                    }
+
+                    if ((y-smallY) < top) {
+                        top = y-smallY;
+                    }
+
+                    if ((largeY-y) < bottom) {
+                        bottom = largeY-y;
+                    }
+                }
+            }
+        }
+
+        bmp=Bitmap.createBitmap(bmp,left,top,imgWidth-left-right, imgHeight-top-bottom);
+        imageBitmap = bmp;
     }
 
     public void setLoadingModal(View loadingModal) {

@@ -33,12 +33,10 @@ public class MainActivity extends AppCompatActivity {
         FloatingActionButton fab = findViewById(R.id.fab);
 
         fab.setOnClickListener(view -> {
-            final Uri testImageUri = getUriFromDrawable(R.drawable.test_image);
+            final Uri testImageUri = getUriFromDrawable(R.drawable.nice);
 
             CutOut.activity()
                     .src(testImageUri)
-                    .bordered()
-                    .noCrop()
                     .start(this);
         });
 
