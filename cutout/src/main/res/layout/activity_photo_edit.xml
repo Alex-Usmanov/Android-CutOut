@@ -20,7 +20,7 @@
             android:theme="@style/ThemeOverlay.AppCompat"
             app:titleTextAppearance="@style/ToolbarTheme"
             app:titleMarginStart="12dp"
-            app:title="Редактировать">
+            app:title="Редактирование">
 
             <Button
                 android:id="@+id/done"

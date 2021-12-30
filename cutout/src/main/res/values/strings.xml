@@ -8,4 +8,5 @@
     <string name="intro_zoom_description">Используйте инструмент "Лупа" чтобы приблизить части изображения и более точно стереть фон</string>
     <string name="intro_label">Быстрый просмотр</string>
     <string name="image_chooser_message">Выберите изображение для обрезки</string>
+    <string name="crop_image_menu_crop">Обрезать</string>
 </resources>
