@@ -28,7 +28,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center_horizontal"
-            android:text="Brush remover" />
+            android:text="Кисть удаления" />
     </LinearLayout>
 
     <LinearLayout
@@ -48,7 +48,7 @@
             android:layout_height="wrap_content"
             android:gravity="center"
             android:layout_gravity="center_horizontal"
-            android:text="Auto background\nremove" />
+            android:text="Автоматическое\nудаление фона" />
     </LinearLayout>
     <View
         android:layout_width="wrap_content"
